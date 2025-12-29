@@ -2,6 +2,7 @@ const std = @import("std");
 
 pub const TokenError = error{
     UnexpectedCharacter,
+    UnterminatedString,
 };
 
 pub const TokenType = enum {
@@ -64,8 +65,22 @@ pub const Tokenizer = struct {
             ']' => Token.init(.right_bracket, "]"),
             ':' => Token.init(.colon, ":"),
             ',' => Token.init(.comma, ","),
+            '"' => self.tokenizeString(),
             else => TokenError.UnexpectedCharacter,
         };
+    }
+
+    fn tokenizeString(self: *Tokenizer) !Token {
+        const start = self.current - 1; // include the opening "
+
+        // find the closing quote
+        while (self.current < self.source.len and self.source[self.current] != '"') {
+            self.current += 1;
+        }
+
+        if (self.current >= self.source.len) return TokenError.UnterminatedString;
+        self.current += 1; // move past the "
+        return Token.init(.string, self.source[start..self.current]);
     }
 };
 
@@ -74,6 +89,13 @@ pub fn skipWhiteSpace(char: u8) bool {
         ' ', '\t', '\n' => true,
         else => false,
     };
+}
+
+test "tokenize string" {
+    var tokenizer = Tokenizer.init("\"hello\"");
+    const token = try tokenizer.nextToken();
+    try std.testing.expect(token.type == .string);
+    try std.testing.expectEqualStrings("\"hello\"", token.lexeme);
 }
 
 test "all whitespace returns eof" {
