@@ -6,7 +6,22 @@ pub const Value = union(enum) {
     number: f64,
     string: []const u8,
     array: []const Value,
+    object: std.StringHashMap(Value),
 };
+
+test "create object values" {
+    const allocator = std.testing.allocator;
+
+    var map = std.StringHashMap(Value)
+        .init(allocator);
+    defer map.deinit();
+
+    try map.put("name", Value{ .string = "Elie" });
+    try map.put("version", Value{ .number = 1.0 });
+
+    const obj = Value{ .object = map };
+    try std.testing.expect(obj.object.count() == 2);
+}
 
 test "create array value" {
     const items = [_]Value{
