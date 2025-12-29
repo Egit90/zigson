@@ -44,17 +44,9 @@ pub const Tokenizer = struct {
     }
 
     pub fn nextToken(self: *Tokenizer) !Token {
-        if (self.current >= self.source.len) {
-            return Token.init(.eof, "");
-        }
-
-        while (self.current < self.source.len and skipWhiteSpace(self.source[self.current])) {
-            self.current += 1;
-        }
-
-        if (self.current >= self.source.len) {
-            return Token.init(.eof, "");
-        }
+        if (self.checkForEof()) |eof_token| return eof_token;
+        self.skipWhiteSpace();
+        if (self.checkForEof()) |eof_token| return eof_token;
 
         const c = self.source[self.current];
         self.current += 1;
@@ -82,14 +74,20 @@ pub const Tokenizer = struct {
         self.current += 1; // move past the "
         return Token.init(.string, self.source[start..self.current]);
     }
-};
 
-pub fn skipWhiteSpace(char: u8) bool {
-    return switch (char) {
-        ' ', '\t', '\n' => true,
-        else => false,
-    };
-}
+    fn skipWhiteSpace(self: *Tokenizer) void {
+        while (self.current < self.source.len and std.ascii.isWhitespace(self.source[self.current])) {
+            self.current += 1;
+        }
+    }
+
+    fn checkForEof(self: *Tokenizer) ?Token {
+        if (self.current >= self.source.len) {
+            return Token.init(.eof, "");
+        }
+        return null;
+    }
+};
 
 test "tokenize string" {
     var tokenizer = Tokenizer.init("\"hello\"");
