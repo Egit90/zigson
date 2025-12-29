@@ -1,10 +1,16 @@
 const std = @import("std");
+
+pub const TokenError = error{
+    UnexpectedCharacter,
+};
+
 pub const TokenType = enum {
     left_brace, // {
     right_brace, // }
     left_bracket, // [
     right_bracket, // ]
-    colon, // ,
+    colon, // :
+    comma, // ,
     string,
     number,
     true_literal,
@@ -36,25 +42,84 @@ pub const Tokenizer = struct {
         };
     }
 
-    pub fn nextToken(self: *Tokenizer) Token {
+    pub fn nextToken(self: *Tokenizer) !Token {
         if (self.current >= self.source.len) {
             return Token.init(.eof, "");
         }
 
+        while (self.current < self.source.len and skipWhiteSpace(self.source[self.current])) {
+            self.current += 1;
+        }
+
         const c = self.source[self.current];
         self.current += 1;
-
         return switch (c) {
             '{' => Token.init(.left_brace, "{"),
-            else => Token.init(.eof, ""),
+            '}' => Token.init(.right_brace, "}"),
+            '[' => Token.init(.left_bracket, "["),
+            ']' => Token.init(.right_bracket, "]"),
+            ':' => Token.init(.colon, ":"),
+            ',' => Token.init(.comma, ","),
+            else => TokenError.UnexpectedCharacter,
         };
     }
 };
 
+pub fn skipWhiteSpace(char: u8) bool {
+    return switch (char) {
+        ' ', '\t', '\n' => true,
+        else => false,
+    };
+}
+
+test "unexpected character returns error" {
+    var tokenizer = Tokenizer.init("@");
+    const result = tokenizer.nextToken();
+    try std.testing.expectError(TokenError.UnexpectedCharacter, result);
+}
+
+test "skip whitespace" {
+    var tokenizer = Tokenizer.init("  {  }  ");
+    const t1 = try tokenizer.nextToken();
+    const t2 = try tokenizer.nextToken();
+    try std.testing.expect(t1.type == .left_brace);
+    try std.testing.expect(t2.type == .right_brace);
+}
+
+test "tokenize colon" {
+    var tokenizer = Tokenizer.init(":");
+    const token = try tokenizer.nextToken();
+    try std.testing.expect(token.type == .colon);
+}
+
+test "tokenize comma" {
+    var tokenizer = Tokenizer.init(",");
+    const token = try tokenizer.nextToken();
+    try std.testing.expect(token.type == .comma);
+}
+
+test "tokenize right bracket" {
+    var tokenizer = Tokenizer.init("]");
+    const token = try tokenizer.nextToken();
+    try std.testing.expect(token.type == .right_bracket);
+}
+
+test "tokenize left bracket" {
+    var tokenizer = Tokenizer.init("[");
+    const token = try tokenizer.nextToken();
+    try std.testing.expect(token.type == .left_bracket);
+}
+
 test "tokenize left brace" {
     var tokenizer = Tokenizer.init("{");
-    const token = tokenizer.nextToken();
+    const token = try tokenizer.nextToken();
     try std.testing.expect(token.type == .left_brace);
+}
+
+test "tokenize right brace" {
+    var tokenizer = Tokenizer.init("}");
+    const token = try tokenizer.nextToken();
+    try std.testing.expect(token.type == .right_brace);
 }
 
 test "token type exists" {
