@@ -3,6 +3,8 @@ const std = @import("std");
 pub const TokenError = error{
     UnexpectedCharacter,
     UnterminatedString,
+    InvalidNumber,
+    InvalidKeyword,
 };
 
 pub const TokenType = enum {
@@ -58,6 +60,8 @@ pub const Tokenizer = struct {
             ':' => Token.init(.colon, ":"),
             ',' => Token.init(.comma, ","),
             '"' => self.tokenizeString(),
+            '0'...'9', '-' => self.tokenizeNumber(),
+            't', 'f', 'n' => self.tokenizeKeyword(),
             else => TokenError.UnexpectedCharacter,
         };
     }
@@ -75,6 +79,56 @@ pub const Tokenizer = struct {
         return Token.init(.string, self.source[start..self.current]);
     }
 
+    fn tokenizeNumber(self: *Tokenizer) !Token {
+        const start = self.current - 1;
+
+        // Consume integer part
+        while (self.current < self.source.len and std.ascii.isDigit(self.source[self.current])) {
+            self.current += 1;
+        }
+
+        // Check for decimal point
+        if (self.current < self.source.len and self.source[self.current] == '.') {
+            self.current += 1; // consume '.'
+
+            // Must have at least one digit after decimal point!
+            if (self.current >= self.source.len or !std.ascii.isDigit(self.source[self.current])) {
+                return TokenError.InvalidNumber;
+            }
+
+            // Consume fractional part
+            while (self.current < self.source.len and std.ascii.isDigit(self.source[self.current])) {
+                self.current += 1;
+            }
+        }
+
+        return Token.init(.number, self.source[start..self.current]);
+    }
+
+    fn tokenizeKeyword(self: *Tokenizer) !Token {
+        const start = self.current - 1;
+
+        while (self.current < self.source.len and std.ascii.isAlphanumeric(self.source[self.current])) {
+            self.current += 1;
+        }
+
+        const text = self.source[start..self.current];
+
+        if (std.mem.eq(u8, text, "true")) {
+            return Token.init(.true_literal, text);
+        }
+
+        if (std.mem.eq(u8, text, "false")) {
+            return Token.init(.false_literal, text);
+        }
+
+        if (std.mem.eq(u8, text, "null")) {
+            return Token.init(.null_literal, text);
+        }
+
+        return TokenError.InvalidKeyword;
+    }
+
     fn skipWhiteSpace(self: *Tokenizer) void {
         while (self.current < self.source.len and std.ascii.isWhitespace(self.source[self.current])) {
             self.current += 1;
@@ -88,6 +142,44 @@ pub const Tokenizer = struct {
         return null;
     }
 };
+
+test "tokenize true" {
+    var tokenizer = Tokenizer.init("true");
+    const token = try tokenizer.nextToken();
+    try std.testing.expect(token.type == .true_literal);
+}
+
+test "tokenize false" {
+    var tokenizer = Tokenizer.init("false");
+    const token = try tokenizer.nextToken();
+    try std.testing.expect(token.type == .false_literal);
+}
+
+test "tokenize null" {
+    var tokenizer = Tokenizer.init("null");
+    const token = try tokenizer.nextToken();
+    try std.testing.expect(token.type == .null_literal);
+}
+
+test "invalid number with trailing dot" {
+    var tokenizer = Tokenizer.init("34.");
+    const result = tokenizer.nextToken();
+    try std.testing.expectError(TokenError.InvalidNumber, result);
+}
+
+test "tokenize integer" {
+    var tokenizer = Tokenizer.init("123");
+    const token = try tokenizer.nextToken();
+    try std.testing.expect(token.type == .number);
+    try std.testing.expectEqualStrings("123", token.lexeme);
+}
+
+test "tokenize float" {
+    var tokenizer = Tokenizer.init("3.14");
+    const token = try tokenizer.nextToken();
+    try std.testing.expect(token.type == .number);
+    try std.testing.expectEqualStrings("3.14", token.lexeme);
+}
 
 test "tokenize string" {
     var tokenizer = Tokenizer.init("\"hello\"");
