@@ -8,6 +8,18 @@ pub const Value = union(enum) {
     array: []const Value,
 };
 
+test "create array value" {
+    const items = [_]Value{
+        Value{ .number = 1 },
+        Value{ .number = 2 },
+        Value{ .number = 4 },
+    };
+    const arr = Value{ .array = &items };
+
+    try std.testing.expect(arr.array.len == 3);
+    try std.testing.expect(arr.array[0].number == 1);
+}
+
 test "create string value" {
     const str = Value{ .string = "hello" };
     try std.testing.expect(std.mem.eql(u8, str.string, "hello"));
