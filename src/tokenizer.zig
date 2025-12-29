@@ -51,6 +51,10 @@ pub const Tokenizer = struct {
             self.current += 1;
         }
 
+        if (self.current >= self.source.len) {
+            return Token.init(.eof, "");
+        }
+
         const c = self.source[self.current];
         self.current += 1;
         return switch (c) {
@@ -70,6 +74,12 @@ pub fn skipWhiteSpace(char: u8) bool {
         ' ', '\t', '\n' => true,
         else => false,
     };
+}
+
+test "all whitespace returns eof" {
+    var tokenizer = Tokenizer.init("   ");
+    const token = try tokenizer.nextToken();
+    try std.testing.expect(token.type == .eof);
 }
 
 test "unexpected character returns error" {
