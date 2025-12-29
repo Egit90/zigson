@@ -81,10 +81,17 @@ pub const Tokenizer = struct {
 
     fn tokenizeNumber(self: *Tokenizer) !Token {
         const start = self.current - 1;
+        const has_minus = self.source[start] == '-';
 
         // Consume integer part
+        const digit_start = self.current;
         while (self.current < self.source.len and std.ascii.isDigit(self.source[self.current])) {
             self.current += 1;
+        }
+
+        // If we had minus but no digits, that's an error
+        if (has_minus and self.current == digit_start) {
+            return TokenError.InvalidNumber;
         }
 
         // Check for decimal point
@@ -114,15 +121,15 @@ pub const Tokenizer = struct {
 
         const text = self.source[start..self.current];
 
-        if (std.mem.eq(u8, text, "true")) {
+        if (std.mem.eql(u8, text, "true")) {
             return Token.init(.true_literal, text);
         }
 
-        if (std.mem.eq(u8, text, "false")) {
+        if (std.mem.eql(u8, text, "false")) {
             return Token.init(.false_literal, text);
         }
 
-        if (std.mem.eq(u8, text, "null")) {
+        if (std.mem.eql(u8, text, "null")) {
             return Token.init(.null_literal, text);
         }
 
@@ -159,6 +166,26 @@ test "tokenize null" {
     var tokenizer = Tokenizer.init("null");
     const token = try tokenizer.nextToken();
     try std.testing.expect(token.type == .null_literal);
+}
+
+test "tokenize negative integer" {
+    var tokenizer = Tokenizer.init("-123");
+    const token = try tokenizer.nextToken();
+    try std.testing.expect(token.type == .number);
+    try std.testing.expectEqualStrings("-123", token.lexeme);
+}
+
+test "tokenize negative float" {
+    var tokenizer = Tokenizer.init("-3.14");
+    const token = try tokenizer.nextToken();
+    try std.testing.expect(token.type == .number);
+    try std.testing.expectEqualStrings("-3.14", token.lexeme);
+}
+
+test "invalid number with just minus" {
+    var tokenizer = Tokenizer.init("-");
+    const result = tokenizer.nextToken();
+    try std.testing.expectError(TokenError.InvalidNumber, result);
 }
 
 test "invalid number with trailing dot" {
